@@ -1,0 +1,202 @@
+Fix the existing **Roommate Expense Splitter** application. Do NOT rebuild the project from scratch and do NOT change the existing UI unnecessarily.
+
+The application currently has these problems:
+
+### 1. DEMO DATA REAPPEARS AFTER REFRESH
+
+Currently, after I add/delete expenses and refresh the page, the original four demo expenses appear again:
+
+* Groceries — ₹800 — A
+* Electricity — ₹1200 — B
+* Internet — ₹600 — C
+* Cleaning — ₹400 — D
+
+This is incorrect.
+
+Fix the database initialization/seed logic so that demo data is inserted ONLY when the database is completely empty or when the user explicitly clicks "Load Demo Data".
+
+Refreshing the browser must NOT recreate demo expenses.
+
+Once a user deletes an expense, it must stay deleted after refreshing.
+
+Once a user adds an expense, it must remain after refreshing.
+
+Do NOT insert demo data every time the Flask application starts.
+
+### 2. SETTLEMENT HISTORY IS NOT WORKING
+
+There is currently a Settlement History section, but completed settlements are not appearing correctly.
+
+Fix it so that when a user marks a settlement as paid/completed:
+
+* The settlement is stored in the SQLite `settlements` table.
+* It appears in Settlement History.
+* The record contains:
+
+  * payer
+  * receiver
+  * amount
+  * date
+  * status
+
+Example:
+
+A → B ₹300
+
+After clicking "Mark Paid", the history should show:
+
+A | B | ₹300 | date | Completed
+
+Do not merely change something visually on the frontend. Persist the settlement in SQLite.
+
+### 3. MARKING A SETTLEMENT AS PAID MUST UPDATE CURRENT SETTLEMENTS
+
+Currently, clicking "Mark Paid" does not remove the transaction from the Settle Up page.
+
+Fix this.
+
+Example:
+
+Before:
+
+C → B ₹150
+D → B ₹300
+D → A ₹50
+
+If I click:
+
+**Mark Paid** on C → B ₹150
+
+Then the current outstanding settlements should no longer show:
+
+C → B ₹150
+
+Only the remaining unpaid transactions should remain.
+
+The completed transaction should appear in Settlement History.
+
+### 4. BALANCES MUST UPDATE AFTER PAYMENT
+
+This is very important.
+
+The "Owes" and "Gets Back" amounts must reflect outstanding unpaid settlements.
+
+Do NOT simply change the original expense records.
+
+Expenses represent what people actually paid and must remain unchanged.
+
+Instead, calculate:
+
+**Original balance from expenses**
+minus
+**completed settlements**
+
+to determine the remaining outstanding balance.
+
+For example:
+
+If:
+
+C owes B ₹150
+
+Before payment:
+
+C → Owes ₹150
+B → Gets Back ₹150
+
+After C pays B ₹150:
+
+C → Settled / ₹0
+B → Settled / ₹0
+
+The expense records should still exist.
+
+Only the outstanding balance should change because the settlement was completed.
+
+### 5. IMPORTANT ACCOUNTING LOGIC
+
+Do not modify or delete expenses when a settlement is marked as paid.
+
+Expenses are historical records.
+
+Settlements are payments made to resolve those balances.
+
+Therefore:
+
+Expenses → determine the original balances.
+
+Settlements → determine how much of those balances has already been paid.
+
+Current outstanding balance should be calculated using both.
+
+### 6. AVOID DOUBLE COUNTING
+
+Make sure completed settlements are not counted multiple times.
+
+If a settlement is marked paid once, it should affect the balance exactly once.
+
+Do not allow the same settlement to be marked paid repeatedly.
+
+After completion:
+
+* Status becomes `completed`
+* The action button should disappear or become disabled
+* The transaction should no longer appear in outstanding settlements
+* It should appear in Settlement History
+
+### 7. DATABASE
+
+Inspect the existing SQLite database implementation and fix it rather than replacing the database unnecessarily.
+
+Make sure the settlements table has appropriate fields such as:
+
+* id
+* payer_id
+* receiver_id
+* amount
+* date
+* status
+
+Use foreign keys where appropriate.
+
+If the existing schema is missing something required, make the smallest safe database change necessary.
+
+### 8. REFRESH TEST
+
+After fixing the code, test this exact sequence:
+
+1. Start application.
+2. Confirm demo data appears only if database was initially empty.
+3. Add a new expense.
+4. Refresh.
+5. Confirm the new expense is still present.
+6. Delete an expense.
+7. Refresh.
+8. Confirm the deleted expense does NOT return.
+9. Go to Settle Up.
+10. Mark one settlement as paid.
+11. Confirm that settlement disappears from outstanding settlements.
+12. Confirm it appears in Settlement History.
+13. Confirm payer's outstanding "Owes" amount decreases.
+14. Confirm receiver's outstanding "Gets Back" amount decreases.
+15. Refresh.
+16. Confirm all of these changes persist.
+
+### 9. DO NOT CHANGE
+
+Do not:
+
+* Rebuild the entire application
+* Replace Flask
+* Replace SQLite
+* Add paid services
+* Add APIs
+* Add authentication
+* Add AI
+* Redesign the UI unnecessarily
+* Remove existing working features
+
+Focus only on fixing:
+**database persistence + settlement completion + settlement history + balance updates + demo data initialization.**
+
+After making the fixes, run the application and verify the complete flow before finishing.

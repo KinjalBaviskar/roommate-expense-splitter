@@ -15,7 +15,6 @@ from database import (
     calculate_balances,
     delete_expense,
     delete_roommate,
-    get_connection,
     get_expenses,
     get_roommates,
     get_settlements,
@@ -44,12 +43,13 @@ CATEGORIES = [
 def dashboard_data() -> dict:
     roommates = get_roommates()
     expenses = get_expenses()
-    total, share, balances = calculate_balances(roommates, expenses)
+    settlements = get_settlements()
+    total, share, balances = calculate_balances(roommates, expenses, settlements)
     plan = build_settlement_plan(balances)
     return {
         "roommates": roommates,
         "expenses": expenses,
-        "settlements": get_settlements(),
+        "settlements": settlements,
         "total": total,
         "share": share,
         "balances": balances,
@@ -171,14 +171,29 @@ def remove_expense(expense_id: int):
 
 @app.post("/settlements")
 def complete_settlement():
-    payer = request.form.get("payer", "").strip()
-    receiver = request.form.get("receiver", "").strip()
     try:
+        payer_id = int(request.form.get("payer_id", "0"))
+        receiver_id = int(request.form.get("receiver_id", "0"))
         amount = Decimal(request.form.get("amount", "0")).quantize(Decimal("0.01"))
-        if not payer or not receiver or payer == receiver or amount <= 0:
+        data = dashboard_data()
+        matching_plan = next(
+            (
+                item
+                for item in data["settlement_plan"]
+                if item["payer_id"] == payer_id
+                and item["receiver_id"] == receiver_id
+                and item["amount"] == amount
+            ),
+            None,
+        )
+        if not matching_plan:
             raise ValueError
-        add_settlement(payer, receiver, amount)
-        flash(f"Settlement recorded: {payer} paid {receiver}.", "success")
+        add_settlement(payer_id, receiver_id, amount)
+        flash(
+            f"Settlement recorded: {matching_plan['payer']} paid "
+            f"{matching_plan['receiver']}.",
+            "success",
+        )
     except (InvalidOperation, ValueError):
         flash("That settlement could not be recorded.", "error")
     return redirect(url_for("index", section="settle"))

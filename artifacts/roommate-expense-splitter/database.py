@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 
 MONEY = Decimal("0.01")
@@ -26,6 +26,8 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_db() -> None:
+    """Create the schema and seed demo data only for a truly empty database."""
+    seeded_empty_database = False
     with get_connection() as connection:
         connection.executescript(
             """
@@ -48,14 +50,57 @@ def init_db() -> None:
 
             CREATE TABLE IF NOT EXISTS settlements (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                payer_id INTEGER NOT NULL,
+                receiver_id INTEGER NOT NULL,
                 payer TEXT NOT NULL,
                 receiver TEXT NOT NULL,
                 amount NUMERIC NOT NULL CHECK (amount > 0),
                 settled_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                status TEXT NOT NULL DEFAULT 'Completed'
+                status TEXT NOT NULL DEFAULT 'completed',
+                FOREIGN KEY (payer_id) REFERENCES roommates (id) ON DELETE RESTRICT,
+                FOREIGN KEY (receiver_id) REFERENCES roommates (id) ON DELETE RESTRICT
             );
             """
         )
+
+        # Migrate the original name-only settlement table without losing history.
+        settlement_columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(settlements)").fetchall()
+        }
+        if "payer_id" not in settlement_columns:
+            connection.execute(
+                "ALTER TABLE settlements ADD COLUMN payer_id INTEGER REFERENCES roommates(id)"
+            )
+        if "receiver_id" not in settlement_columns:
+            connection.execute(
+                "ALTER TABLE settlements ADD COLUMN receiver_id INTEGER REFERENCES roommates(id)"
+            )
+        connection.execute(
+            """
+            UPDATE settlements
+            SET payer_id = (SELECT id FROM roommates WHERE roommates.name = settlements.payer)
+            WHERE payer_id IS NULL
+            """
+        )
+        connection.execute(
+            """
+            UPDATE settlements
+            SET receiver_id = (SELECT id FROM roommates WHERE roommates.name = settlements.receiver)
+            WHERE receiver_id IS NULL
+            """
+        )
+        connection.execute(
+            "UPDATE settlements SET status = lower(status) WHERE status IS NOT NULL"
+        )
+
+        seeded_empty_database = all(
+            connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
+            for table in ("roommates", "expenses", "settlements")
+        )
+
+    if seeded_empty_database:
+        load_demo_data()
 
 
 def get_roommates() -> list[sqlite3.Row]:
@@ -83,7 +128,8 @@ def get_settlements() -> list[sqlite3.Row]:
     with get_connection() as connection:
         return connection.execute(
             """
-            SELECT id, payer, receiver, amount, settled_at, status
+            SELECT id, payer_id, receiver_id, payer, receiver, amount,
+                   settled_at, status
             FROM settlements
             ORDER BY settled_at DESC, id DESC
             """
@@ -91,27 +137,59 @@ def get_settlements() -> list[sqlite3.Row]:
 
 
 def calculate_balances(
-    roommates: list[sqlite3.Row], expenses: list[sqlite3.Row]
+    roommates: list[sqlite3.Row],
+    expenses: list[sqlite3.Row],
+    settlements: Iterable[sqlite3.Row] = (),
 ) -> tuple[Decimal, Decimal, list[dict[str, Any]]]:
-    """Calculate total, equal share, and each roommate's balance."""
+    """Calculate original balances, then subtract completed settlement payments."""
     total = sum((money(expense["amount"]) for expense in expenses), Decimal("0.00"))
-    share = (total / len(roommates)).quantize(MONEY, rounding=ROUND_HALF_UP) if roommates else Decimal("0.00")
+    share = (
+        (total / len(roommates)).quantize(MONEY, rounding=ROUND_HALF_UP)
+        if roommates
+        else Decimal("0.00")
+    )
     paid = {roommate["id"]: Decimal("0.00") for roommate in roommates}
     for expense in expenses:
         paid[expense["paid_by"]] += money(expense["amount"])
 
+    name_to_id = {roommate["name"]: roommate["id"] for roommate in roommates}
+    outstanding = {
+        roommate["id"]: (paid[roommate["id"]] - share).quantize(
+            MONEY, rounding=ROUND_HALF_UP
+        )
+        for roommate in roommates
+    }
+
+    for settlement in settlements:
+        status = str(settlement["status"] or "").lower()
+        if status != "completed":
+            continue
+        payer_id = settlement["payer_id"] or name_to_id.get(settlement["payer"])
+        receiver_id = settlement["receiver_id"] or name_to_id.get(
+            settlement["receiver"]
+        )
+        if payer_id in outstanding and receiver_id in outstanding:
+            amount = money(settlement["amount"])
+            outstanding[payer_id] += amount
+            outstanding[receiver_id] -= amount
+
     balances = []
     for roommate in roommates:
-        paid_amount = paid[roommate["id"]].quantize(MONEY)
-        balance = (paid_amount - share).quantize(MONEY, rounding=ROUND_HALF_UP)
+        balance = outstanding[roommate["id"]].quantize(
+            MONEY, rounding=ROUND_HALF_UP
+        )
         balances.append(
             {
                 "id": roommate["id"],
                 "name": roommate["name"],
-                "paid": paid_amount,
+                "paid": paid[roommate["id"]].quantize(MONEY),
                 "share": share,
                 "balance": balance,
-                "status": "Gets back" if balance > 0 else "Owes" if balance < 0 else "Settled",
+                "status": "Gets back"
+                if balance > 0
+                else "Owes"
+                if balance < 0
+                else "Settled",
             }
         )
     return total.quantize(MONEY), share, balances
@@ -120,12 +198,12 @@ def calculate_balances(
 def build_settlement_plan(balances: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Match debtors to creditors to produce a short, practical payment plan."""
     debtors = [
-        {"name": item["name"], "amount": abs(item["balance"])}
+        {"id": item["id"], "name": item["name"], "amount": abs(item["balance"])}
         for item in balances
         if item["balance"] < 0
     ]
     creditors = [
-        {"name": item["name"], "amount": item["balance"]}
+        {"id": item["id"], "name": item["name"], "amount": item["balance"]}
         for item in balances
         if item["balance"] > 0
     ]
@@ -140,7 +218,9 @@ def build_settlement_plan(balances: list[dict[str, Any]]) -> list[dict[str, Any]
         if amount > 0:
             transactions.append(
                 {
+                    "payer_id": debtor["id"],
                     "payer": debtor["name"],
+                    "receiver_id": creditor["id"],
                     "receiver": creditor["name"],
                     "amount": amount,
                 }
@@ -201,15 +281,36 @@ def delete_expense(expense_id: int) -> None:
         connection.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
 
 
-def add_settlement(payer: str, receiver: str, amount: Decimal) -> None:
+def add_settlement(payer_id: int, receiver_id: int, amount: Decimal) -> None:
     with get_connection() as connection:
+        people = connection.execute(
+            """
+            SELECT id, name FROM roommates
+            WHERE id IN (?, ?)
+            """,
+            (payer_id, receiver_id),
+        ).fetchall()
+        names = {person["id"]: person["name"] for person in people}
+        if payer_id not in names or receiver_id not in names:
+            raise ValueError("That settlement has an invalid roommate.")
         connection.execute(
-            "INSERT INTO settlements (payer, receiver, amount) VALUES (?, ?, ?)",
-            (payer, receiver, str(amount)),
+            """
+            INSERT INTO settlements
+                (payer_id, receiver_id, payer, receiver, amount, status)
+            VALUES (?, ?, ?, ?, ?, 'completed')
+            """,
+            (
+                payer_id,
+                receiver_id,
+                names[payer_id],
+                names[receiver_id],
+                str(amount),
+            ),
         )
 
 
 def load_demo_data() -> None:
+    """Explicitly replace local data with the documented demo household."""
     with get_connection() as connection:
         connection.execute("DELETE FROM settlements")
         connection.execute("DELETE FROM expenses")
