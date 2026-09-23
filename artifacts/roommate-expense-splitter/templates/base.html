@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="A simple, clear way for roommates to track shared expenses and settle up." />
+    <title>{% block title %}Roommate Splitter{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="{{ url_for('index') }}" aria-label="Roommate Splitter home">
+          <span class="brand-mark"><span></span><span></span><span></span></span>
+          <span>Roommate<br /><strong>Splitter</strong></span>
+        </a>
+        <div class="sidebar-kicker">HOUSEHOLD</div>
+        <div class="household-card">
+          <div class="household-avatar">HS</div>
+          <div><strong>Home Street</strong><span>{{ roommates|length }} roommates</span></div>
+          <span class="online-dot"></span>
+        </div>
+        <nav class="main-nav" aria-label="Main navigation">
+          {% for key, label, icon in [
+            ("dashboard", "Dashboard", "grid"),
+            ("roommates", "Roommates", "users"),
+            ("expenses", "Expenses", "receipt"),
+            ("settle", "Settle up", "arrow"),
+            ("history", "History", "clock")
+          ] %}
+          <a class="nav-link {% if active_section == key %}active{% endif %}" href="{{ url_for('index', section=key) }}">
+            <span class="nav-icon icon-{{ icon }}"></span>{{ label }}
+            {% if key == "settle" and settlement_plan|length %}<span class="nav-count">{{ settlement_plan|length }}</span>{% endif %}
+          </a>
+          {% endfor %}
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="tip-card">
+            <span class="tip-label">QUICK TIP</span>
+            <p>Keep the whole house in the loop. Add expenses as they happen.</p>
+          </div>
+          <form method="post" action="{{ url_for('demo') }}" onsubmit="return confirm('This will replace the current roommates and expenses with demo data. Continue?')">
+            <button class="demo-button" type="submit"><span class="icon-spark"></span> Load demo data</button>
+          </form>
+          <div class="sidebar-footer">Roommate Splitter <span>v1.0</span></div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="mobile-brand"><span class="brand-mark"><span></span><span></span><span></span></span><strong>Roommate Splitter</strong></div>
+          <div class="topbar-actions">
+            <span class="last-saved">All changes saved locally</span>
+            <span class="avatar avatar-indigo">HS</span>
+          </div>
+        </header>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          <div class="flash-stack">
+            {% for category, message in messages %}<div class="flash flash-{{ category }}">{{ message }}<button type="button" class="flash-close" aria-label="Dismiss">×</button></div>{% endfor %}
+          </div>
+          {% endif %}
+        {% endwith %}
+        <div class="page-wrap">
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+    </div>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  </body>
+</html>

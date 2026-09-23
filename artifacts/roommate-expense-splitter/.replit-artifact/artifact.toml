@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Roommate Expense Splitter"
+description = "A student-friendly Flask and SQLite dashboard for tracking shared roommate expenses, calculating balances, and settling up with fewer transactions."
+version = "1.0.0"
+id = "artifacts/roommate-expense-splitter"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20839
+
+[services.development]
+run = "pnpm --filter @workspace/roommate-expense-splitter run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/roommate-expense-splitter", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/roommate-expense-splitter/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20839"
+BASE_PATH = "/"

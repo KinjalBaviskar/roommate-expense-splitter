@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+{% if active_section == "dashboard" %}
+<section class="page-heading">
+  <div>
+    <div class="eyebrow">WEDNESDAY, {{ today|date_display|upper }}</div>
+    <h1>Good morning, <span>Home Street.</span></h1>
+    <p>Here’s where your household stands today.</p>
+  </div>
+  <a class="button button-primary" href="{{ url_for('index', section='expenses') }}#expense-form"><span class="icon-plus"></span> Add expense</a>
+</section>
+<section class="metric-grid">
+  <article class="metric-card metric-primary"><div class="metric-label">TOTAL EXPENSES <span class="icon-info"></span></div><strong>{{ total|inr }}</strong><span class="metric-note">Across {{ expenses|length }} expense{% if expenses|length != 1 %}s{% endif %}</span><span class="metric-orbit orbit-one"></span><span class="metric-orbit orbit-two"></span></article>
+  <article class="metric-card"><div class="metric-label">YOUR HOUSEHOLD <span class="icon-users"></span></div><strong>{{ roommates|length }}</strong><span class="metric-note">Active roommates</span><div class="mini-avatars">{% for person in roommates[:5] %}<span class="avatar avatar-{{ loop.index }}">{{ person.name[:2]|upper }}</span>{% endfor %}</div></article>
+  <article class="metric-card"><div class="metric-label">EQUAL SHARE <span class="icon-split"></span></div><strong>{{ share|inr }}</strong><span class="metric-note">Per person</span><div class="share-line"><span style="width: {{ [((share / total * 100) if total else 0), 100]|min }}%"></span></div></article>
+  <article class="metric-card"><div class="metric-label">TO SETTLE <span class="icon-arrow-up"></span></div><strong>{{ settlement_total|inr }}</strong><span class="metric-note">{% if settlement_plan %}{{ settlement_plan|length }} transaction{% if settlement_plan|length != 1 %}s{% endif %} recommended{% else %}Everyone is settled{% endif %}</span><a class="text-link" href="{{ url_for('index', section='settle') }}">View settle up <span>→</span></a></article>
+</section>
+<section class="content-grid">
+  <article class="panel balances-panel">
+    <div class="panel-header"><div><div class="eyebrow">AT A GLANCE</div><h2>Household balances</h2></div><a class="text-link" href="{{ url_for('index', section='roommates') }}">View roommates <span>→</span></a></div>
+    {% if balances %}
+    <div class="balance-list">
+      {% for person in balances %}
+      <div class="balance-row">
+        <span class="avatar avatar-{{ loop.index }}">{{ person.name[:2]|upper }}</span><div class="person-name"><strong>{{ person.name }}</strong><span>Equal share {{ person.share|inr }}</span></div>
+        <div class="balance-paid"><span>Paid</span><strong>{{ person.paid|inr }}</strong></div>
+        <div class="balance-amount balance-{{ person.status|lower|replace(' ', '-') }}"><strong>{% if person.balance > 0 %}+{% endif %}{{ person.balance|inr }}</strong><span>{{ person.status }}</span></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state"><div class="empty-icon icon-users"></div><h3>Start your household</h3><p>Add roommates to see balances here.</p><a class="button button-secondary" href="{{ url_for('index', section='roommates') }}">Add roommates</a></div>
+    {% endif %}
+  </article>
+  <article class="panel activity-panel">
+    <div class="panel-header"><div><div class="eyebrow">RECENT ACTIVITY</div><h2>Latest expenses</h2></div><a class="text-link" href="{{ url_for('index', section='expenses') }}">View all <span>→</span></a></div>
+    {% if expenses %}
+    <div class="activity-list">
+      {% for expense in expenses[:4] %}
+      <div class="activity-row"><span class="category-dot dot-{{ expense.category|lower|replace(' ', '-') }}"></span><div><strong>{{ expense.description }}</strong><span>{{ expense.paid_by_name }} · {{ expense.expense_date|date_display }}</span></div><strong class="activity-amount">{{ expense.amount|inr }}</strong></div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state compact"><div class="empty-icon icon-receipt"></div><h3>No expenses yet</h3><p>Add your first shared expense.</p></div>
+    {% endif %}
+  </article>
+</section>
+{% elif active_section == "roommates" %}
+<section class="page-heading"><div><div class="eyebrow">HOUSEHOLD</div><h1>Your roommates</h1><p>Manage who shares expenses in Home Street.</p></div></section>
+<section class="content-grid split-layout">
+  <article class="panel"><div class="panel-header"><div><div class="eyebrow">PEOPLE</div><h2>{{ roommates|length }} roommate{% if roommates|length != 1 %}s{% endif %}</h2></div></div>
+    {% if roommates %}<div class="roommate-list">{% for person in roommates %}<div class="roommate-row"><span class="avatar avatar-{{ loop.index }}">{{ person.name[:2]|upper }}</span><div><strong>{{ person.name }}</strong><span>Roommate {{ loop.index }}</span></div><form method="post" action="{{ url_for('remove_roommate', roommate_id=person.id) }}" onsubmit="return confirm('Delete {{ person.name }}? This only works if they have no expenses.')"><button class="icon-button danger" aria-label="Delete {{ person.name }}">×</button></form></div>{% endfor %}</div>{% else %}<div class="empty-state"><div class="empty-icon icon-users"></div><h3>No roommates yet</h3><p>Add the people you share expenses with.</p></div>{% endif %}
+  </article>
+  <article class="panel form-panel"><div class="eyebrow">NEW ROOMMATE</div><h2>Add someone</h2><p class="form-intro">Names are unique so everyone is easy to spot in the dashboard.</p><form method="post" action="{{ url_for('create_roommate') }}" class="stack-form"><label>Name<input name="name" placeholder="e.g. Priya" maxlength="40" required autofocus /></label><button class="button button-primary" type="submit"><span class="icon-plus"></span> Add roommate</button></form></article>
+</section>
+{% elif active_section == "expenses" %}
+<section class="page-heading"><div><div class="eyebrow">SPENDING</div><h1>Shared expenses</h1><p>Every expense is split equally across your household.</p></div><a class="button button-primary" href="#expense-form"><span class="icon-plus"></span> Add expense</a></section>
+{% if not roommates %}<div class="notice"><strong>Add roommates first.</strong><span>You need at least one roommate before adding an expense.</span><a class="text-link" href="{{ url_for('index', section='roommates') }}">Manage roommates →</a></div>{% endif %}
+<section class="content-grid expenses-layout">
+  <article class="panel expense-form-panel" id="expense-form"><div class="eyebrow">{% if editing_expense %}EDIT EXPENSE{% else %}NEW EXPENSE{% endif %}</div><h2>{% if editing_expense %}Update payment{% else %}Record a payment{% endif %}</h2><form method="post" action="{% if editing_expense %}{{ url_for('edit_expense', expense_id=editing_expense.id) }}{% else %}{{ url_for('create_expense') }}{% endif %}" class="stack-form">
+    <label>Description<input name="description" placeholder="What was it for?" value="{{ editing_expense.description if editing_expense else '' }}" required /></label>
+    <div class="form-row"><label>Amount<div class="input-prefix"><span>₹</span><input name="amount" type="number" step="0.01" min="0.01" placeholder="0.00" value="{{ editing_expense.amount if editing_expense else '' }}" required /></div></label><label>Date<input name="expense_date" type="date" value="{{ editing_expense.expense_date if editing_expense else today }}" required /></label></div>
+    <div class="form-row"><label>Category<select name="category">{% for category in categories %}<option value="{{ category }}" {% if editing_expense and editing_expense.category == category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select></label><label>Paid by<select name="paid_by" required><option value="" disabled {% if not editing_expense %}selected{% endif %}>Select roommate</option>{% for person in roommates %}<option value="{{ person.id }}" {% if editing_expense and editing_expense.paid_by == person.id %}selected{% endif %}>{{ person.name }}</option>{% endfor %}</select></label></div>
+    <div class="form-actions"><button class="button button-primary full-button" type="submit" {% if not roommates %}disabled{% endif %}>{% if editing_expense %}Save changes{% else %}Save expense{% endif %}</button>{% if editing_expense %}<a class="button button-secondary full-button" href="{{ url_for('index', section='expenses') }}">Cancel</a>{% endif %}</div>
+  </form></article>
+  <article class="panel table-panel"><div class="panel-header"><div><div class="eyebrow">ALL RECORDS</div><h2>{{ total|inr }} total</h2></div><span class="record-count">{{ expenses|length }} records</span></div>
+    {% if expenses %}<div class="expense-table-wrap"><table><thead><tr><th>Expense</th><th>Paid by</th><th>Date</th><th class="align-right">Amount</th><th></th></tr></thead><tbody>{% for expense in expenses %}<tr><td><div class="table-title"><span class="category-dot dot-{{ expense.category|lower|replace(' ', '-') }}"></span><div><strong>{{ expense.description }}</strong><span>{{ expense.category }}</span></div></div></td><td>{{ expense.paid_by_name }}</td><td>{{ expense.expense_date|date_display }}</td><td class="align-right"><strong>{{ expense.amount|inr }}</strong></td><td class="align-right row-actions"><a class="edit-text" href="{{ url_for('index', section='expenses', edit=expense.id) }}#expense-form">Edit</a><form method="post" action="{{ url_for('remove_expense', expense_id=expense.id) }}" onsubmit="return confirm('Delete this expense?')"><button class="delete-text" type="submit">Delete</button></form></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state compact"><div class="empty-icon icon-receipt"></div><h3>No expenses recorded</h3><p>Your shared spending will appear here.</p></div>{% endif %}
+  </article>
+</section>
+{% elif active_section == "settle" %}
+<section class="page-heading"><div><div class="eyebrow">CLEAR THE AIR</div><h1>Settle up</h1><p>A practical plan that keeps the number of payments low.</p></div></section>
+<section class="settle-summary"><div><span class="eyebrow">TOTAL TO SETTLE</span><strong>{{ settlement_total|inr }}</strong></div><div class="settle-summary-note"><span class="icon-split"></span><span>Balances are calculated from all shared expenses and split equally.</span></div></section>
+<section class="content-grid split-layout">
+  <article class="panel"><div class="panel-header"><div><div class="eyebrow">RECOMMENDED</div><h2>Payment plan</h2></div><span class="plan-badge">{{ settlement_plan|length }} step{% if settlement_plan|length != 1 %}s{% endif %}</span></div>
+    {% if settlement_plan %}<div class="plan-list">{% for item in settlement_plan %}<div class="plan-row"><div class="plan-person"><span class="avatar avatar-{{ loop.index }}">{{ item.payer[:2]|upper }}</span><strong>{{ item.payer }}</strong></div><span class="plan-line"><i></i><b>{{ item.amount|inr }}</b><i></i></span><div class="plan-person receiver"><strong>{{ item.receiver }}</strong><span class="avatar avatar-{{ loop.index + 1 }}">{{ item.receiver[:2]|upper }}</span></div><form method="post" action="{{ url_for('complete_settlement') }}" class="plan-action"><input type="hidden" name="payer" value="{{ item.payer }}" /><input type="hidden" name="receiver" value="{{ item.receiver }}" /><input type="hidden" name="amount" value="{{ item.amount }}" /><button class="button button-small button-secondary" type="submit">Mark paid</button></form></div>{% endfor %}</div>{% else %}<div class="empty-state"><div class="empty-icon icon-check"></div><h3>All settled</h3><p>Everyone is square for now. Nice work.</p></div>{% endif %}
+  </article>
+  <article class="panel"><div class="panel-header"><div><div class="eyebrow">BALANCE BREAKDOWN</div><h2>Who owes what</h2></div></div><div class="settle-breakdown">{% for person in balances %}<div class="breakdown-row"><span class="avatar avatar-{{ loop.index }}">{{ person.name[:2]|upper }}</span><span><strong>{{ person.name }}</strong><small>{{ person.status }}</small></span><strong class="{% if person.balance > 0 %}positive{% elif person.balance < 0 %}negative{% endif %}">{% if person.balance > 0 %}+{% endif %}{{ person.balance|inr }}</strong></div>{% else %}<div class="empty-state compact"><p>Add roommates and expenses to calculate balances.</p></div>{% endfor %}</div></article>
+</section>
+{% elif active_section == "history" %}
+<section class="page-heading"><div><div class="eyebrow">RECORDS</div><h1>Settlement history</h1><p>A running record of payments completed between roommates.</p></div></section>
+<article class="panel table-panel history-panel"><div class="panel-header"><div><div class="eyebrow">COMPLETED PAYMENTS</div><h2>{{ settlements|length }} settlement{% if settlements|length != 1 %}s{% endif %}</h2></div><span class="history-total">{{ settlements|length }} total</span></div>
+{% if settlements %}<div class="expense-table-wrap"><table><thead><tr><th>Payer</th><th>Receiver</th><th>Date</th><th class="align-right">Amount</th><th class="align-right">Status</th></tr></thead><tbody>{% for settlement in settlements %}<tr><td><div class="table-title"><span class="avatar avatar-{{ loop.index }}">{{ settlement.payer[:2]|upper }}</span><strong>{{ settlement.payer }}</strong></div></td><td>{{ settlement.receiver }}</td><td>{{ settlement.settled_at[:10]|date_display }}</td><td class="align-right"><strong>{{ settlement.amount|inr }}</strong></td><td class="align-right"><span class="status-pill status-completed"><span></span>{{ settlement.status }}</span></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><div class="empty-icon icon-clock"></div><h3>No settlements yet</h3><p>Completed payments will be logged here.</p><a class="button button-secondary" href="{{ url_for('index', section='settle') }}">View payment plan</a></div>{% endif %}</article>
+{% endif %}
+{% endblock %}

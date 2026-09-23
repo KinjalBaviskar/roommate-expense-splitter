@@ -1,0 +1,286 @@
+Build a complete, functional full-stack web application called **Roommate Expense Splitter**.
+
+The goal is to create a small but polished college project that I can explain in interviews.
+
+### IMPORTANT — FREE ONLY
+
+* Build and run this project using only Replit's free capabilities.
+* Do NOT use paid APIs, OpenAI/Gemini APIs, paid databases, Firebase, Supabase, Stripe, or any other paid external service.
+* Do NOT add features that require API keys or subscriptions.
+* Use SQLite as the database.
+* Keep dependencies minimal.
+* Do not ask me to upgrade to a paid plan.
+* Do not over-engineer the project.
+
+### TECHNOLOGY
+
+Use:
+
+* Python
+* Flask
+* SQLite
+* HTML
+* CSS
+* Vanilla JavaScript
+* Jinja templates
+
+Do not use React or other unnecessary frameworks.
+
+### APPLICATION
+
+Create a clean responsive dashboard for a group of roommates sharing expenses.
+
+Example:
+
+4 roommates:
+
+* A
+* B
+* C
+* D
+
+Expenses:
+
+* A pays ₹800 for groceries
+* B pays ₹1200 for electricity
+* C pays ₹600 for internet
+* D pays ₹400 for cleaning
+
+The application calculates each person's share and determines who owes whom.
+
+### FEATURES TO IMPLEMENT
+
+#### 1. Dashboard
+
+Show:
+
+* Group name
+* Number of roommates
+* Total expenses
+* Average expense per person
+* Each roommate's:
+
+  * Amount paid
+  * Equal share
+  * Balance
+  * Status: "Owes" / "Gets back" / "Settled"
+
+Use Indian Rupee (₹) throughout the application.
+
+#### 2. Roommates
+
+Allow the user to:
+
+* Add roommate
+* Delete roommate
+* View all roommates
+
+Each roommate should have:
+
+* ID
+* Name
+
+Prevent duplicate names.
+
+#### 3. Expenses
+
+Allow the user to:
+
+* Add expense
+* Edit expense
+* Delete expense
+* View all expenses
+
+Expense fields:
+
+* Description
+* Amount
+* Category
+* Paid by
+* Date
+
+Categories:
+
+* Rent
+* Groceries
+* Electricity
+* Internet
+* Water
+* Cleaning
+* Transportation
+* Other
+
+For now, support **equal splitting among all roommates**.
+
+Validate that:
+
+* Amount is greater than 0
+* Description is not empty
+* A valid roommate is selected
+
+#### 4. Balance Calculation
+
+Calculate:
+
+Total expenses = sum of all expenses
+
+Equal share per person =
+Total expenses / number of roommates
+
+Individual balance =
+Amount paid - equal share
+
+Positive balance means the person should receive money.
+
+Negative balance means the person owes money.
+
+Example:
+
+A paid ₹800
+B paid ₹1200
+C paid ₹600
+D paid ₹400
+
+Total = ₹3000
+
+Each share = ₹750
+
+A = +₹50
+B = +₹450
+C = -₹150
+D = -₹350
+
+Display these calculations clearly.
+
+#### 5. Settlement Algorithm
+
+Implement a proper algorithm to minimize the number of transactions.
+
+For example, instead of showing every possible payment, generate transactions such as:
+
+C → B ₹150
+D → B ₹300
+D → A ₹50
+
+The algorithm should:
+
+* Separate debtors and creditors
+* Match debtors with creditors
+* Generate the minimum/practical number of settlement transactions
+* Never generate a ₹0 transaction
+* Handle decimal amounts safely
+
+Keep the settlement algorithm in a separate Python function so it is easy to explain in an interview.
+
+#### 6. Settle Up Page
+
+Create a "Settle Up" section displaying:
+
+* Total amount to be settled
+* People who owe money
+* People who should receive money
+* Recommended transactions
+
+Each transaction should show:
+
+**Person A → Person B: ₹500**
+
+Allow the user to mark a settlement as completed.
+
+#### 7. Settlement History
+
+Store completed settlements in SQLite.
+
+Show:
+
+* Payer
+* Receiver
+* Amount
+* Date
+* Status
+
+#### 8. Database
+
+Use SQLite with separate tables for:
+
+* roommates
+* expenses
+* settlements
+
+Use primary keys and foreign keys properly.
+
+Do not store the entire application state in JSON.
+
+#### 9. UI
+
+Create a simple modern student-project UI.
+
+Navigation:
+
+**Dashboard | Roommates | Expenses | Settle Up | History**
+
+Use cards, tables and clear buttons.
+
+Make it responsive for desktop and mobile.
+
+Do not spend time creating unnecessarily complex animations.
+
+#### 10. Sample Data
+
+Provide a **Load Demo Data** option so I can immediately demonstrate the project.
+
+Demo data:
+
+Roommates:
+
+* A
+* B
+* C
+* D
+
+Expenses:
+
+* Groceries — ₹800 — A
+* Electricity — ₹1200 — B
+* Internet — ₹600 — C
+* Cleaning — ₹400 — D
+
+The dashboard should immediately calculate the balances from this data.
+
+### PROJECT STRUCTURE
+
+Keep the code organized and beginner-friendly, for example:
+
+app.py
+database.py
+templates/
+static/
+css/
+js/
+
+You can use a slightly different structure if it makes the project simpler.
+
+### IMPORTANT
+
+This is an interview project, so prioritize:
+
+1. Working functionality
+2. Correct expense calculations
+3. Correct settlement algorithm
+4. Clean database design
+5. Clean UI
+6. Understandable code
+
+Do NOT add authentication, AI chatbot, payment gateway, email notifications, external APIs, or other unnecessary features.
+
+After implementation:
+
+* Run the application
+* Test adding roommates
+* Test adding/editing/deleting expenses
+* Test balance calculations
+* Test settlement generation
+* Test demo data
+* Fix any errors you find
+
+Finally, make sure the project is actually runnable on Replit and do not leave major features as placeholders.
