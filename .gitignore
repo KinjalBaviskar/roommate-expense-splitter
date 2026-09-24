@@ -1,12 +1,29 @@
+# Python
 venv/
-.env
+.venv/
 __pycache__/
-*.pyc
+*.py[cod]
 *.db
+
+# Environment variables
+.env
+.env.*
+
+# Flask
 instance/
+
+# Generated/build files
 dist/
 *.tsbuildinfo
-artifacts/*/dist/
-artifacts/*/__pycache__/
-artifacts/*/instance/
-lib/*/dist/
+
+# Replit/generated project files
+.artifacts/
+artifacts/
+.agents/
+.conversation/
+attached_assets/
+lib/
+scripts/
+
+# Node
+node_modules/
